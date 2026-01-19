@@ -6,7 +6,8 @@ import {
   Compass, MapPin, PieChart as PieChartIcon, AlertTriangle, Info, X, Clock,
   Filter, Download, ChevronRight, Layers, Target, MousePointer2, ChevronLeft, Loader2,
   Sparkles, Crosshair, ChevronDown, Hand, Trophy, Star, Database, Cpu, FileCheck, Save, ArrowRightCircle,
-  TrendingUp, Activity, Smile, Frown, ShieldCheck, BarChart3
+  TrendingUp, Activity, Smile, Frown, ShieldCheck, BarChart3, TrendingDown, Car, Train, Bike, Wallet,
+  ToggleLeft, ToggleRight, LayoutGrid, Bus
 } from 'lucide-react';
 import { TeamPage } from './TeamPage';
 import { SettingsPage } from './SettingsPage';
@@ -15,16 +16,15 @@ import { Merchant, Report, EvaluationResult, RecommendationResult, Recommendatio
 import * as mockService from '../services/mockAuthService';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid, LineChart, Line
+  BarChart, Bar, XAxis, YAxis, Tooltip, Cell, PieChart, Pie, AreaChart, Area, CartesianGrid, LineChart, Line,
+  ComposedChart, Legend
 } from 'recharts';
 
-// 视图定义
-type ViewType = 'dashboard' | 'evaluation' | 'recommendation' | 'report' | 'team' | 'settings';
+// --- Types & Constants ---
 
-// 定义哪些视图是基于地图的模式
+type ViewType = 'dashboard' | 'evaluation' | 'recommendation' | 'report' | 'team' | 'settings';
 const MAP_MODES: ViewType[] = ['dashboard', 'evaluation', 'recommendation', 'report'];
 
-// 消息类型定义
 interface Notification {
   id: string;
   title: string;
@@ -34,7 +34,77 @@ interface Notification {
   read: boolean;
 }
 
-// --- 辅助函数：将推荐项转换为评估结果格式 ---
+// 颜色定义
+const COLOR_PALETTE = {
+  primary: '#10b981',
+  blue: '#3b82f6',
+  orange: '#f97316',
+  red: '#ef4444',
+  purple: '#8b5cf6',
+  pink: '#ec4899',
+  cyan: '#06b6d4',
+  yellow: '#f59e0b',
+  slate: '#64748b'
+};
+
+// 模拟数据：客群详情
+const DATA_GENDER = { female: 47.9, male: 52.1 };
+const DATA_AGE_DIST = [
+  { name: '18岁以下', value: 4.3 },
+  { name: '19-24岁', value: 21.9 },
+  { name: '25-34岁', value: 31.1 },
+  { name: '35-44岁', value: 27.4 },
+  { name: '45-54岁', value: 12.7 },
+  { name: '55岁以上', value: 2.5 },
+];
+const DATA_EDU = [
+  { name: '本科及以上', value: 37.1, fill: '#60a5fa' },
+  { name: '高中以下', value: 38.7, fill: '#fbbf24' },
+  { name: '专科', value: 24.2, fill: '#34d399' },
+];
+const DATA_OCCUPATION = [
+  { name: '技术服务', value: 18.8, fill: '#c084fc' },
+  { name: '金融', value: 14.2, fill: '#818cf8' },
+  { name: '零售', value: 11.8, fill: '#fb923c' },
+  { name: '制造', value: 8.5, fill: '#4ade80' },
+  { name: '教育', value: 5.5, fill: '#2dd4bf' },
+  { name: '其他', value: 41.2, fill: '#94a3b8' },
+];
+const DATA_ATTRIBUTES = [
+  { label: '有房一族', value: 80, icon: <Building2 size={14}/>, color: 'bg-cyan-400' },
+  { label: '有车', value: 70, icon: <Car size={14}/>, color: 'bg-orange-400' },
+  { label: '有孩家庭', value: 60, icon: <Smile size={14}/>, color: 'bg-purple-400' },
+  { label: '宠物', value: 50, icon: <Check size={14}/>, color: 'bg-rose-400' },
+];
+const DATA_INCOME_LEVEL = [
+  { name: '<2000', value: 15, fill: '#3b82f6' }, // Blue
+  { name: '2k-5k', value: 25, fill: '#f87171' }, // Red
+  { name: '5k-10k', value: 35, fill: '#fbbf24' }, // Yellow
+  { name: '>10k', value: 25, fill: '#34d399' }, // Green
+];
+const DATA_TRAVEL = [
+  { label: '公交', value: 10, icon: <Bus size={16}/>, color: '#8b5cf6' },
+  { label: '地铁', value: 60, icon: <Train size={16}/>, color: '#10b981' },
+  { label: '骑车', value: 10, icon: <Bike size={16}/>, color: '#0ea5e9' },
+  { label: '打车', value: 10, icon: <Car size={16}/>, color: '#10b981' },
+  { label: '自驾', value: 10, icon: <Car size={16}/>, color: '#0ea5e9' },
+];
+const DATA_BRAND_PREF = [
+  { name: '瑞幸咖啡', value: 35, fill: '#3b82f6' },
+  { name: '星巴克', value: 25, fill: '#fbbf24' },
+  { name: 'Manner', value: 15, fill: '#34d399' },
+  { name: 'Tims', value: 15, fill: '#f87171' },
+  { name: '其他', value: 10, fill: '#94a3b8' },
+];
+
+const DATA_COMPETITION_RELATION = [
+  { name: '直接竞品', value: 35, fill: '#ef4444' },
+  { name: '潜在竞品', value: 25, fill: '#f59e0b' },
+  { name: '互补业态', value: 40, fill: '#10b981' },
+];
+
+// --- Helper Functions ---
+
 const mapRecToEval = (item: RecommendationItem): EvaluationResult => {
   return {
     score: item.score,
@@ -57,13 +127,14 @@ const mapRecToEval = (item: RecommendationItem): EvaluationResult => {
     aiSummary: `${item.matchReason}。根据${item.name}的各项指标分析，该区域非常适合您的开店需求，尤其在客流稳定性和竞争优势方面表现突出。`,
     geoData: {
       center: item.center,
-      radius: 500, // 默认显示范围
+      radius: 500, 
       pois: []
     }
   };
 };
 
-// --- 子组件提取：导航项 ---
+// --- Sub-Components ---
+
 const NavItem = ({ icon, label, view, currentView, onClick }: { icon: React.ReactNode, label: string, view: ViewType, currentView: ViewType, onClick: () => void }) => (
   <button 
     onClick={onClick}
@@ -86,341 +157,643 @@ const NavItem = ({ icon, label, view, currentView, onClick }: { icon: React.Reac
   </button>
 );
 
-// --- 子组件提取：评估报告详情视图 (重构版) ---
+const StarRating = ({ score }: { score: number }) => {
+  const stars = Math.round(score / 20 * 2) / 2; 
+  return (
+    <div className="flex text-yellow-400 gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => {
+        if (stars >= i) return <Star key={i} size={12} fill="currentColor" />;
+        if (stars >= i - 0.5) return <div key={i} className="relative"><Star size={12} className="text-slate-200" fill="currentColor" /><div className="absolute top-0 left-0 w-1/2 overflow-hidden"><Star size={12} fill="currentColor" /></div></div>;
+        return <Star key={i} size={12} className="text-slate-200" fill="currentColor" />;
+      })}
+    </div>
+  );
+};
+
+// --- Evaluation Report View (High Fidelity - Updated Header & Tabs) ---
 const EvaluationReportView = ({ result, onClose, onSave, isSaved, isSaving, backLabel }: any) => {
   const [activeTab, setActiveTab] = useState('overview');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 模拟各个板块的数据 (通常这些应该包含在 EvaluationResult 中)
-  const mockData = {
-    demographics: [
-      { name: '18-25岁', value: 20 },
-      { name: '26-35岁', value: 45 }, // 主力
-      { name: '36-45岁', value: 25 },
-      { name: '45岁+', value: 10 },
-    ],
-    competition: [
-      { name: '瑞幸咖啡', value: 35, fill: '#0052d9' },
-      { name: '星巴克', value: 25, fill: '#006241' },
-      { name: 'Manner', value: 15, fill: '#555555' },
-      { name: '其他', value: 25, fill: '#cccccc' },
-    ],
-    trend: [
-      { month: '1月', value: 80 }, { month: '2月', value: 82 }, { month: '3月', value: 85 },
-      { month: '4月', value: 89 }, { month: '5月', value: 92 }, { month: '6月', value: 96 },
-    ]
-  };
-
   const sections = [
-    { id: 'overview', label: '综合评分' },
-    { id: 'commercial', label: '商业成熟度' },
-    { id: 'customer', label: '客群与客流' },
-    { id: 'industry', label: '行业趋势' },
-    { id: 'competition', label: '竞争格局' },
-    { id: 'potential', label: '发展潜力' },
+    { id: 'overview', label: '综合' },
+    { id: 'commercial', label: '商圈' },
+    { id: 'customer', label: '客群' },
+    { id: 'industry', label: '行业' },
+    { id: 'competition', label: '竞争' },
+    { id: 'potential', label: '发展' },
   ];
 
   const scrollToSection = (id: string) => {
     setActiveTab(id);
     const element = document.getElementById(`section-${id}`);
     if (element && scrollRef.current) {
-      // 简单的滚动定位，减去头部高度
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!scrollRef.current) return;
+      for (const section of sections) {
+        const element = document.getElementById(`section-${section.id}`);
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          if (rect.top >= 0 && rect.top < 300) {
+            setActiveTab(section.id);
+            break;
+          }
+        }
+      }
+    };
+    const ref = scrollRef.current;
+    if (ref) ref.addEventListener('scroll', handleScroll);
+    return () => { if (ref) ref.removeEventListener('scroll', handleScroll); };
+  }, []);
 
   if (!result) return null;
 
   return (
     <div className="flex flex-col h-full bg-white relative">
-       {/* 1. 固定头部：标题与分数 */}
-       <div className="p-4 border-b border-slate-100 bg-white z-20 flex justify-between items-start shrink-0">
-          <div>
-             <div className="flex items-center gap-2 mb-1">
+       {/* 1. Header (Updated to match screenshot) */}
+       <div className="p-5 bg-white z-20 flex justify-between items-start shrink-0 relative pb-4">
+          <div className="flex-1 overflow-hidden mr-4">
+             {/* Title & Trophy */}
+             <div className="flex items-center gap-2 mb-2">
                 {backLabel && (
-                  <button onClick={onClose} className="mr-2 text-slate-400 hover:text-slate-600">
-                    <ChevronLeft size={20} />
+                  <button onClick={onClose} className="mr-1 text-slate-400 hover:text-slate-600">
+                    <ChevronLeft size={22} />
                   </button>
                 )}
-                <h2 className="text-xl font-extrabold text-slate-900 leading-tight">{result.locationName}</h2>
-                <Trophy size={18} className="text-yellow-500" fill="currentColor" />
+                <h2 className="text-xl font-extrabold text-slate-900 truncate tracking-tight leading-none">{result.locationName}</h2>
+                <Trophy size={18} className="text-yellow-500 shrink-0 drop-shadow-sm" fill="currentColor" />
              </div>
-             <div className="flex gap-2">
-                {result.tags?.map((tag: string, i: number) => (
-                   <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-500 font-medium">
-                      {tag}
-                   </span>
-                ))}
+             {/* Tags (Color Matched) */}
+             <div className="flex gap-2 flex-wrap">
+                {result.tags?.map((tag: string, i: number) => {
+                   const isHot = tag.includes('热度') || tag.includes('红');
+                   return (
+                      <span key={i} className={`text-[10px] px-2 py-1 rounded-md font-bold whitespace-nowrap ${
+                         isHot 
+                         ? 'bg-[#fff7ed] text-[#f97316] border border-orange-100' // Orange-50/600
+                         : 'bg-[#eff6ff] text-[#3b82f6] border border-blue-100'   // Blue-50/500
+                      }`}>
+                         {tag}
+                      </span>
+                   )
+                })}
              </div>
           </div>
-          <div className="text-right">
-             <div className="text-3xl font-extrabold text-brand-500 leading-none">{result.score}</div>
-             <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">综合评分</div>
+          
+          {/* Score (Right Aligned) */}
+          <div className="text-right flex flex-col justify-start">
+             <div className="flex items-baseline justify-end gap-0.5">
+               <span className="text-4xl font-extrabold text-[#ef4444] tracking-tighter leading-none">{result.score}</span>
+               <span className="text-xs font-bold text-slate-400">分</span>
+             </div>
           </div>
+
           {!backLabel && (
-             <button onClick={onClose} className="absolute top-4 right-4 text-slate-300 hover:text-slate-600">
+             <button 
+               onClick={onClose} 
+               className="absolute -top-1 -right-1 p-2 text-slate-300 hover:text-slate-500 transition-colors"
+             >
                 <X size={20} />
              </button>
           )}
        </div>
 
-       {/* 2. 吸顶导航 Tab */}
-       <div className="flex bg-white border-b border-slate-100 px-2 sticky top-0 z-10 overflow-x-auto no-scrollbar shrink-0">
+       {/* 2. Tabs (Updated: Sticky, Bold Line) */}
+       <div className="flex bg-white border-b border-slate-100 px-4 sticky top-0 z-30 shadow-[0_4px_10px_-5px_rgba(0,0,0,0.03)] shrink-0">
           {sections.map((sec) => (
              <button
                key={sec.id}
                onClick={() => scrollToSection(sec.id)}
-               className={`flex-shrink-0 px-4 py-3 text-xs font-bold transition-all border-b-2 ${
+               className={`flex-1 py-3 text-sm font-bold transition-all relative outline-none select-none ${
                  activeTab === sec.id 
-                 ? 'text-brand-600 border-brand-500' 
-                 : 'text-slate-500 border-transparent hover:text-slate-700'
+                 ? 'text-slate-900' 
+                 : 'text-slate-400 hover:text-slate-600'
                }`}
              >
                 {sec.label}
+                {/* Active Indicator: Center Bar */}
+                {activeTab === sec.id && (
+                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-5 h-1 bg-slate-800 rounded-t-sm"></div>
+                )}
              </button>
           ))}
        </div>
 
-       {/* 3. 滚动内容区域 */}
-       <div className="flex-1 overflow-y-auto bg-slate-50/50 custom-scrollbar scroll-smooth" ref={scrollRef}>
-          <div className="p-4 space-y-4 pb-20">
+       {/* 3. Content Body (Unchanged Functional Logic) */}
+       <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar scroll-smooth relative" ref={scrollRef}>
+          <div className="p-4 space-y-4 pb-24">
              
-             {/* Section 1: 综合概览 (图1) */}
-             <div id="section-overview" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
-                <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><Activity size={18} className="text-brand-500" /> 综合评估概览</h3>
-                   <span className="text-xs font-bold text-brand-600 bg-brand-50 px-2 py-1 rounded">推荐指数: 极高</span>
+             {/* Section 1: Overview */}
+             <div id="section-overview" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
+                <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-50">
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-slate-800 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">综合评分</h3>
+                   </div>
+                   <span className="text-2xl font-extrabold text-red-500">{result.score}分</span>
                 </div>
                 
-                {/* 雷达图 */}
-                <div className="h-56 relative w-full flex justify-center mb-4">
+                <p className="text-xs text-slate-600 leading-relaxed mb-6 text-justify bg-slate-50 p-3 rounded-xl border border-slate-100">
+                   {result.aiSummary}
+                </p>
+
+                {/* Radar Chart */}
+                <div className="h-56 relative w-full flex justify-center mb-6">
                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart cx="50%" cy="50%" outerRadius="80%" data={result.dimensions}>
+                      <RadarChart cx="50%" cy="50%" outerRadius="75%" data={result.dimensions}>
                          <PolarGrid stroke="#e2e8f0" />
-                         <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10 }} />
+                         <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 'bold' }} />
                          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                         <Radar
-                            name="Score"
-                            dataKey="A"
-                            stroke="#10b981"
-                            strokeWidth={2}
-                            fill="#10b981"
-                            fillOpacity={0.2}
-                         />
+                         <Radar name="Score" dataKey="A" stroke="#ef4444" strokeWidth={2} fill="#ef4444" fillOpacity={0.2} />
                       </RadarChart>
                    </ResponsiveContainer>
-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-brand-600 font-extrabold text-2xl bg-white/80 px-2 rounded backdrop-blur-sm shadow-sm">
-                      {result.score}
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center">
+                      <span className="text-red-500 font-extrabold text-xl bg-white/90 px-1 rounded backdrop-blur-sm shadow-sm">{result.score}分</span>
                    </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                   <div className="flex items-center gap-2 mb-2">
-                      <div className="w-5 h-5 rounded-full bg-brand-500 text-white flex items-center justify-center text-[10px] font-bold">AI</div>
-                      <span className="text-xs font-bold text-slate-600">智能选址建议</span>
-                   </div>
-                   <p className="text-xs text-slate-600 leading-relaxed text-justify">
-                      {result.aiSummary}
-                   </p>
+                {/* Dimension List Table */}
+                <div className="space-y-3">
+                   {result.detailScores?.map((item: any, i: number) => {
+                      // Colors for dimensions
+                      const colors = [COLOR_PALETTE.red, COLOR_PALETTE.orange, COLOR_PALETTE.primary, COLOR_PALETTE.blue, COLOR_PALETTE.purple];
+                      const color = colors[i % colors.length];
+                      return (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                           <div className="flex items-center gap-2 w-20 shrink-0">
+                              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{backgroundColor: color}}></div>
+                              <span className="text-slate-500 font-medium truncate">{item.label}</span>
+                           </div>
+                           <div className="flex-1 mx-3 flex flex-col gap-1">
+                              <StarRating score={item.score} />
+                              <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                 <div className="h-full rounded-full" style={{width: `${item.score}%`, backgroundColor: color, opacity: 0.7}}></div>
+                              </div>
+                           </div>
+                           <div className="font-bold text-slate-700 w-8 text-right border border-slate-200 rounded px-1 text-[10px]">
+                              {item.score}
+                           </div>
+                        </div>
+                      );
+                   })}
                 </div>
              </div>
 
-             {/* Section 2: 商业成熟度 (图2) */}
-             <div id="section-commercial" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
+             {/* Section 2: Commercial */}
+             <div id="section-commercial" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
                 <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><Store size={18} className="text-blue-500" /> 商业成熟度</h3>
-                   <span className="text-xl font-extrabold text-blue-500">96<span className="text-xs">分</span></span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                   <div className="bg-blue-50 p-3 rounded-xl">
-                      <div className="text-xs text-blue-400 mb-1">周边写字楼</div>
-                      <div className="text-lg font-bold text-blue-700">32<span className="text-xs font-normal">个</span></div>
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-slate-800 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">商业成熟度</h3>
                    </div>
-                   <div className="bg-blue-50 p-3 rounded-xl">
-                      <div className="text-xs text-blue-400 mb-1">大型商场</div>
-                      <div className="text-lg font-bold text-blue-700">2<span className="text-xs font-normal">个</span></div>
-                   </div>
-                   <div className="bg-slate-50 p-3 rounded-xl">
-                      <div className="text-xs text-slate-400 mb-1">住宅小区</div>
-                      <div className="text-lg font-bold text-slate-700">12<span className="text-xs font-normal">个</span></div>
-                   </div>
-                   <div className="bg-slate-50 p-3 rounded-xl">
-                      <div className="text-xs text-slate-400 mb-1">日均人流</div>
-                      <div className="text-lg font-bold text-slate-700">5.2<span className="text-xs font-normal">万</span></div>
-                   </div>
+                   <span className="text-[10px] font-bold text-red-500 border border-red-200 bg-red-50 px-2 py-0.5 rounded">超过行政区90%商圈</span>
                 </div>
 
-                <div className="space-y-2">
-                   <div className="flex justify-between text-xs border-b border-slate-50 pb-2">
-                      <span className="text-slate-500">核心商圈距离</span>
-                      <span className="font-bold text-slate-700">0.3km (核心区)</span>
-                   </div>
-                   <div className="flex justify-between text-xs border-b border-slate-50 pb-2">
-                      <span className="text-slate-500">平均租金水平</span>
-                      <span className="font-bold text-slate-700">¥18/天/㎡</span>
-                   </div>
-                   <div className="flex justify-between text-xs pb-1">
-                      <span className="text-slate-500">空铺率</span>
-                      <span className="font-bold text-green-600">2.1% (极低)</span>
-                   </div>
-                </div>
-             </div>
-
-             {/* Section 3: 客群与客流 (图3) */}
-             <div id="section-customer" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
-                <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><Users size={18} className="text-orange-500" /> 客群画像</h3>
-                   <span className="text-xl font-extrabold text-orange-500">96<span className="text-xs">分</span></span>
-                </div>
-
+                {/* 配套九宫格 */}
                 <div className="mb-6">
-                   <h4 className="text-xs font-bold text-slate-400 mb-2">年龄分布 (主力: 26-35岁)</h4>
+                   <h4 className="text-xs font-bold text-slate-800 pl-1 mb-3 flex items-center gap-1"><Info size={12} className="text-slate-400"/> 周边地理支撑配套能力</h4>
+                   <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: '住宅区', val: '12个' }, { label: '写字楼', val: '32个' }, { label: '商业区', val: '2个' },
+                        { label: '医院', val: '0个' }, { label: '学校', val: '2个' }, { label: '交通', val: '2个' }
+                      ].map((item, i) => (
+                        <div key={i} className="bg-slate-50 border border-slate-100 rounded-lg p-2 text-center">
+                           <div className="text-[10px] text-slate-500 font-bold mb-1">{item.label}</div>
+                           <div className="text-sm font-extrabold text-slate-800 italic">{item.val}</div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+
+                {/* 关键因子对比表 */}
+                <div>
+                   <h4 className="text-xs font-bold text-slate-800 pl-1 mb-3 flex items-center gap-1"><Info size={12} className="text-slate-400"/> 核心关键因子对比</h4>
+                   <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                      <div className="grid grid-cols-2 bg-slate-100 font-bold text-slate-600 py-2 border-b border-slate-200">
+                         <div className="text-center border-r border-slate-200">核心关键因子</div>
+                         <div className="text-center">(密度) 对比行政区平均</div>
+                      </div>
+                      {[
+                        { k: '住宅户数', v: '高于平均22.5%', good: true },
+                        { k: '住宅平均房价', v: '高于平均2.2倍', good: true },
+                        { k: '写字楼数', v: '高于平均22.5%', good: true },
+                        { k: '商场数', v: '低于平均64倍', good: false },
+                        { k: '入驻商户数', v: '低于平均64倍', good: false },
+                        { k: '医院数', v: '高于平均22.5%', good: true }
+                      ].map((row, i) => (
+                        <div key={i} className={`grid grid-cols-2 py-2.5 border-b border-slate-100 last:border-0 ${i%2===0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                           <div className="text-center text-slate-700 border-r border-slate-100">{row.k}</div>
+                           <div className="text-center font-bold">
+                              <span className={row.good ? 'text-red-500' : 'text-green-600'}>
+                                 {row.v.replace('高于', '').replace('低于', '')}
+                              </span>
+                              <span className="text-[10px] ml-1 font-normal text-slate-400">
+                                 {row.good ? '↑ 高于' : '↓ 低于'}
+                              </span>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+                </div>
+             </div>
+
+             {/* Section 3: Customer (High Fidelity) */}
+             <div id="section-customer" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
+                <div className="flex justify-between items-center mb-2">
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-orange-500 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">客群匹配度</h3>
+                   </div>
+                   <span className="text-xl font-extrabold text-orange-500 italic border border-orange-200 rounded px-1.5">96分</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mb-6 flex items-center gap-1">
+                   <Star size={10} className="text-yellow-400 fill-current" />
+                   超过行政区90%商圈，客流规模极高，客群稳定性强
+                </div>
+
+                {/* 1. Population Stats */}
+                <div className="mb-6">
+                   <h4 className="text-xs font-bold text-slate-800 border-l-2 border-slate-800 pl-2 mb-3">客流规模 (密度)</h4>
+                   <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500 mb-1">常驻人口</div>
+                         <div className="text-sm font-extrabold text-slate-800">12千<span className="text-[10px] font-normal">/km²</span></div>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500 mb-1">居住人口</div>
+                         <div className="text-sm font-extrabold text-slate-800">12千<span className="text-[10px] font-normal">/km²</span></div>
+                      </div>
+                      <div className="bg-slate-50 border border-slate-200 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500 mb-1">办公人口</div>
+                         <div className="text-sm font-extrabold text-slate-800">12千<span className="text-[10px] font-normal">/km²</span></div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* 2. Gender & Age */}
+                <div className="mb-6 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                   <h4 className="text-xs font-bold text-slate-800 mb-3">性别与年龄分布</h4>
+                   
+                   {/* Gender Bar */}
+                   <div className="flex items-center gap-2 mb-4">
+                      <div className="bg-pink-100 text-pink-500 text-[10px] font-bold px-1 rounded">女</div>
+                      <div className="flex-1 h-4 flex rounded-full overflow-hidden shadow-inner">
+                         <div className="bg-pink-400 h-full flex items-center justify-center text-[9px] text-white font-bold" style={{width: `${DATA_GENDER.female}%`}}>
+                            {DATA_GENDER.female}%
+                         </div>
+                         <div className="bg-blue-400 h-full flex items-center justify-center text-[9px] text-white font-bold" style={{width: `${DATA_GENDER.male}%`}}>
+                            {DATA_GENDER.male}%
+                         </div>
+                      </div>
+                      <div className="bg-blue-100 text-blue-500 text-[10px] font-bold px-1 rounded">男</div>
+                   </div>
+
+                   {/* Age Bar Chart */}
                    <div className="h-32 w-full">
                       <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={mockData.demographics} layout="vertical" margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
+                         <BarChart data={DATA_AGE_DIST} layout="vertical" margin={{top: 0, right: 30, left: 0, bottom: 0}}>
                             <XAxis type="number" hide />
-                            <YAxis dataKey="name" type="category" width={60} tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', fontSize: '12px'}} />
-                            <Bar dataKey="value" fill="#f97316" radius={[0, 4, 4, 0]} barSize={16} />
+                            <YAxis type="category" dataKey="name" tick={{fontSize: 9, fill: '#64748b'}} width={50} axisLine={false} tickLine={false} />
+                            <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{fontSize: '10px'}} />
+                            <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={12}>
+                               {DATA_AGE_DIST.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={index === 2 ? '#34d399' : '#94a3b8'} />
+                               ))}
+                            </Bar>
                          </BarChart>
                       </ResponsiveContainer>
                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                   <div>
-                      <h4 className="text-xs font-bold text-slate-400 mb-2">性别比例</h4>
-                      <div className="flex items-center gap-2 h-2 rounded-full overflow-hidden w-full">
-                         <div className="bg-pink-400 h-full" style={{width: '60%'}}></div>
-                         <div className="bg-blue-400 h-full" style={{width: '40%'}}></div>
-                      </div>
-                      <div className="flex justify-between text-[10px] mt-1 text-slate-500">
-                         <span>女 60%</span>
-                         <span>男 40%</span>
-                      </div>
-                   </div>
-                   <div>
-                      <h4 className="text-xs font-bold text-slate-400 mb-2">消费能力</h4>
-                      <div className="flex items-center gap-1">
-                         <span className="text-sm font-bold text-slate-700">高消费</span>
-                         <div className="flex gap-0.5">
-                            {[1,2,3,4].map(i => <div key={i} className="w-1.5 h-3 bg-orange-500 rounded-sm"></div>)}
-                            <div className="w-1.5 h-3 bg-slate-200 rounded-sm"></div>
+                {/* 3. Education & Occupation (Pie Charts) */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                   <div className="bg-white border border-slate-100 rounded-xl p-2 shadow-sm">
+                      <h4 className="text-[10px] font-bold text-slate-700 mb-2 text-center">教育水平</h4>
+                      <div className="h-24 relative">
+                         <ResponsiveContainer>
+                            <PieChart>
+                               <Pie data={DATA_EDU} innerRadius={25} outerRadius={38} paddingAngle={2} dataKey="value">
+                                  {DATA_EDU.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+                               </Pie>
+                            </PieChart>
+                         </ResponsiveContainer>
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="text-[8px] font-bold text-slate-600">本科高</span>
                          </div>
                       </div>
                    </div>
-                </div>
-             </div>
-
-             {/* Section 4: 行业趋势 (图4) */}
-             <div id="section-industry" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
-                <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><TrendingUp size={18} className="text-emerald-500" /> 行业发展趋势</h3>
-                   <span className="text-xl font-extrabold text-emerald-500">95<span className="text-xs">分</span></span>
-                </div>
-
-                <div className="bg-emerald-50/50 p-4 rounded-xl mb-4 border border-emerald-100">
-                   <div className="text-xs text-emerald-800 leading-relaxed font-medium">
-                      该区域餐饮行业正处于<span className="font-bold text-emerald-600">快速上升期</span>。过去半年新开店数量大于闭店数量，且平均存活周期延长。
-                   </div>
-                </div>
-
-                <div className="h-40 w-full">
-                   <h4 className="text-xs font-bold text-slate-400 mb-2">开店热度指数 (近半年)</h4>
-                   <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={mockData.trend}>
-                         <defs>
-                            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                               <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                               <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                            </linearGradient>
-                         </defs>
-                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                         <XAxis dataKey="month" tick={{fontSize: 10, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-                         <Tooltip contentStyle={{borderRadius: '8px', fontSize: '12px'}} />
-                         <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                      </AreaChart>
-                   </ResponsiveContainer>
-                </div>
-             </div>
-
-             {/* Section 5: 竞争格局 (图5) */}
-             <div id="section-competition" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
-                <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><Target size={18} className="text-purple-500" /> 竞争格局评估</h3>
-                   <span className="text-xl font-extrabold text-purple-500">96<span className="text-xs">分</span></span>
-                </div>
-
-                <div className="flex items-center gap-4 mb-4">
-                   <div className="w-1/2 h-32 relative">
-                      <ResponsiveContainer width="100%" height="100%">
-                         <PieChart>
-                            <Pie
-                               data={mockData.competition}
-                               innerRadius={25}
-                               outerRadius={45}
-                               paddingAngle={2}
-                               dataKey="value"
-                            >
-                               {mockData.competition.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                               ))}
-                            </Pie>
-                         </PieChart>
-                      </ResponsiveContainer>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">
-                         份额
+                   <div className="bg-white border border-slate-100 rounded-xl p-2 shadow-sm">
+                      <h4 className="text-[10px] font-bold text-slate-700 mb-2 text-center">职业分布</h4>
+                      <div className="h-24 relative">
+                         <ResponsiveContainer>
+                            <PieChart>
+                               <Pie data={DATA_OCCUPATION} innerRadius={0} outerRadius={38} dataKey="value">
+                                  {DATA_OCCUPATION.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+                               </Pie>
+                            </PieChart>
+                         </ResponsiveContainer>
                       </div>
                    </div>
-                   <div className="w-1/2 space-y-2">
-                      {mockData.competition.map((item, i) => (
-                         <div key={i} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-1.5">
-                               <div className="w-2 h-2 rounded-full" style={{backgroundColor: item.fill}}></div>
-                               <span className="text-slate-600">{item.name}</span>
+                </div>
+
+                {/* 4. Basic Attributes (Vertical Bars) */}
+                <div className="mb-6">
+                   <h4 className="text-xs font-bold text-slate-800 mb-3">基础属性</h4>
+                   <div className="grid grid-cols-4 gap-2 h-32 items-end">
+                      {DATA_ATTRIBUTES.map((attr, i) => (
+                         <div key={i} className="flex flex-col items-center h-full justify-end group">
+                            <div className="text-[10px] font-bold text-slate-800 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">{attr.value}%</div>
+                            <div className="w-3 bg-slate-100 rounded-full relative overflow-hidden flex-1 mb-2">
+                               <div 
+                                  className={`absolute bottom-0 left-0 right-0 rounded-full ${attr.color}`} 
+                                  style={{height: `${attr.value}%`}}
+                               ></div>
                             </div>
-                            <span className="font-bold text-slate-800">{item.value}%</span>
+                            <div className="text-slate-500 mb-1">{attr.icon}</div>
+                            <div className="text-[9px] text-slate-500 whitespace-nowrap scale-90">{attr.label}</div>
                          </div>
                       ))}
                    </div>
                 </div>
 
-                <div className="bg-purple-50 p-3 rounded-xl border border-purple-100 flex gap-3 items-start">
-                   <AlertTriangle size={16} className="text-purple-500 shrink-0 mt-0.5" />
-                   <div className="text-xs text-purple-800">
-                      <strong>竞争预警：</strong> 瑞幸咖啡在500m范围内已有3家门店，市场趋于饱和，建议采取差异化选品策略。
+                {/* 5. Income (Ring Chart) */}
+                <div className="mb-6 border-t border-slate-100 pt-4">
+                   <h4 className="text-xs font-bold text-slate-800 mb-3">消费能力 (月收入)</h4>
+                   <div className="flex items-center gap-4">
+                      <div className="h-32 w-32 relative shrink-0">
+                         <ResponsiveContainer>
+                            <PieChart>
+                               <Pie data={DATA_INCOME_LEVEL} innerRadius={40} outerRadius={55} paddingAngle={0} dataKey="value" startAngle={90} endAngle={-270}>
+                                  {DATA_INCOME_LEVEL.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+                               </Pie>
+                            </PieChart>
+                         </ResponsiveContainer>
+                         <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                            <span className="text-[10px] text-slate-400">主力收入</span>
+                            <span className="text-sm font-bold text-slate-800">5k-10k</span>
+                         </div>
+                      </div>
+                      <div className="flex-1 space-y-1.5">
+                         {DATA_INCOME_LEVEL.map((item, i) => (
+                            <div key={i} className="flex items-center justify-between text-[10px]">
+                               <div className="flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: item.fill}}></div>
+                                  <span className="text-slate-500">{item.name}</span>
+                                </div>
+                               <span className="font-bold text-slate-700">{item.value}%</span>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+
+                {/* 6. Travel Preference */}
+                <div className="mb-6">
+                   <h4 className="text-xs font-bold text-slate-800 mb-3">出行偏好</h4>
+                   <div className="flex justify-between">
+                      {DATA_TRAVEL.map((item, i) => (
+                         <div key={i} className="flex flex-col items-center">
+                            <div className="w-10 h-10 rounded-full border-2 flex items-center justify-center mb-1 text-slate-500 relative" style={{borderColor: item.color}}>
+                               {item.icon}
+                               <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-slate-200 rotate-45 opacity-30"></div>
+                            </div>
+                            <div className="text-[10px] font-bold text-slate-700">{item.label}</div>
+                            <div className="text-[9px] text-slate-400 italic">{item.value}%</div>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+
+                {/* 7. Brand Preference */}
+                <div>
+                   <h4 className="text-xs font-bold text-slate-800 mb-3">到访偏好 (TOP5)</h4>
+                   <div className="flex flex-col items-center mb-4">
+                      <div className="h-32 w-32 relative">
+                         <ResponsiveContainer>
+                            <PieChart>
+                               <Pie data={DATA_BRAND_PREF} innerRadius={35} outerRadius={55} dataKey="value">
+                                  {DATA_BRAND_PREF.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+                               </Pie>
+                            </PieChart>
+                         </ResponsiveContainer>
+                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="text-[10px] font-bold text-slate-600">品牌分布</span>
+                         </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-center mt-2">
+                         {DATA_BRAND_PREF.slice(0,3).map((brand, i) => (
+                            <div key={i} className="flex items-center gap-1 text-[9px]">
+                               <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: brand.fill}}></div>
+                               <span className="text-slate-500">{brand.name}</span>
+                            </div>
+                         ))}
+                      </div>
+                   </div>
+                   <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                      <div className="grid grid-cols-2 bg-slate-100 font-bold text-slate-600 py-2 border-b border-slate-200">
+                         <div className="text-center border-r border-slate-200">品牌名称</div>
+                         <div className="text-center">人数占比</div>
+                      </div>
+                      {DATA_BRAND_PREF.map((brand, i) => (
+                        <div key={i} className="grid grid-cols-2 py-2 border-b border-slate-100 last:border-0 bg-white">
+                           <div className="text-center text-slate-700 border-r border-slate-100">{brand.name}</div>
+                           <div className="text-center font-bold text-slate-800">{brand.value}%</div>
+                        </div>
+                      ))}
                    </div>
                 </div>
              </div>
 
-             {/* Section 6: 发展潜力 (图6) */}
-             <div id="section-potential" className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm scroll-mt-28">
+             {/* Section 4: 行业趋势 */}
+             <div id="section-industry" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
                 <div className="flex justify-between items-center mb-4">
-                   <h3 className="font-bold text-slate-800 flex items-center gap-2"><Map size={18} className="text-indigo-500" /> 发展潜力评估</h3>
-                   <span className="text-xl font-extrabold text-indigo-500">96<span className="text-xs">分</span></span>
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">行业发展趋势</h3>
+                   </div>
+                   <span className="text-xl font-extrabold text-emerald-500 italic">95分</span>
                 </div>
 
-                <ul className="space-y-3">
-                   <li className="flex gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 font-bold shrink-0">
-                         01
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                      <div className="text-xs text-slate-500 mb-1">同行业门店总数</div>
+                      <div className="text-lg font-bold text-slate-800">32<span className="text-xs font-normal">个</span></div>
+                   </div>
+                   <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                      <div className="text-xs text-slate-500 mb-1">协同业态门店数</div>
+                      <div className="text-lg font-bold text-slate-800">2<span className="text-xs font-normal">个</span></div>
+                   </div>
+                </div>
+
+                <div className="mb-4">
+                   <h4 className="text-xs font-bold text-slate-800 border-l-2 border-emerald-500 pl-2 mb-3">行业趋势 (近一年)</h4>
+                   <div className="flex gap-2 text-center">
+                      <div className="flex-1 bg-emerald-50 rounded-lg py-2 border border-emerald-100">
+                         <div className="text-[10px] text-emerald-600">新增门店</div>
+                         <div className="text-lg font-extrabold text-emerald-700">12</div>
                       </div>
-                      <div>
-                         <h4 className="text-sm font-bold text-slate-800">地铁规划利好</h4>
-                         <p className="text-xs text-slate-500 mt-0.5">距规划中地铁15号线站点仅200米，预计2026年通车。</p>
+                      <div className="flex-1 bg-red-50 rounded-lg py-2 border border-red-100">
+                         <div className="text-[10px] text-red-600">闭店数</div>
+                         <div className="text-lg font-extrabold text-red-700">13</div>
                       </div>
-                   </li>
-                   <li className="flex gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 font-bold shrink-0">
-                         02
+                      <div className="flex-1 bg-slate-50 rounded-lg py-2 border border-slate-100">
+                         <div className="text-[10px] text-slate-600">净增量</div>
+                         <div className="text-lg font-extrabold text-slate-700">-1</div>
                       </div>
-                      <div>
-                         <h4 className="text-sm font-bold text-slate-800">人口流入预期</h4>
-                         <p className="text-xs text-slate-500 mt-0.5">周边两个在建高端住宅项目将于明年交付，预计新增3000户高净值家庭。</p>
+                   </div>
+                </div>
+
+                {/* 市场生态状态卡 */}
+                <div className="bg-red-50 rounded-xl p-4 border border-red-100 relative overflow-hidden">
+                   <div className="absolute right-0 top-0 p-2 opacity-10">
+                      <Activity size={64} className="text-red-500" />
+                   </div>
+                   <div className="flex items-center gap-2 mb-3">
+                      <span className="bg-white text-red-500 border border-red-200 text-xs font-bold px-2 py-0.5 rounded">高危区</span>
+                      <span className="text-xs font-bold text-red-800">市场生态失衡，进入高危失血状态</span>
+                   </div>
+                   <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white/60 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500">门店存续率</div>
+                         <div className="text-sm font-bold text-orange-500">30% <span className="text-[8px] bg-orange-100 px-1 rounded">警报</span></div>
                       </div>
-                   </li>
-                </ul>
+                      <div className="bg-white/60 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500">市场成熟度</div>
+                         <div className="text-sm font-bold text-green-600">95% <span className="text-[8px] bg-green-100 px-1 rounded">高熟</span></div>
+                      </div>
+                      <div className="bg-white/60 p-2 rounded-lg">
+                         <div className="text-[10px] text-slate-500">门店收缩率</div>
+                         <div className="text-sm font-bold text-red-600">16% <span className="text-[8px] bg-red-100 px-1 rounded">高</span></div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+
+             {/* Section 5: 竞争格局 */}
+             <div id="section-competition" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
+                <div className="flex justify-between items-center mb-4">
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">竞争分析</h3>
+                   </div>
+                   <span className="text-xl font-extrabold text-blue-500 italic">95分</span>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl mb-4">
+                   <h4 className="text-xs font-bold text-slate-700 mb-4 flex justify-between">
+                      <span>综合竞争档位: <span className="text-slate-900">极度内卷</span></span>
+                   </h4>
+                   <div className="h-40 w-full relative">
+                      <ResponsiveContainer>
+                         <PieChart>
+                            <Pie data={DATA_COMPETITION_RELATION} outerRadius={60} innerRadius={0} dataKey="value">
+                               {DATA_COMPETITION_RELATION.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+                            </Pie>
+                            <Tooltip />
+                            <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{fontSize: '10px'}} />
+                         </PieChart>
+                      </ResponsiveContainer>
+                   </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
+                   <div className="grid grid-cols-3 bg-slate-100 font-bold text-slate-600 py-2 border-b border-slate-200">
+                      <div className="text-center">竞争影响因子</div>
+                      <div className="text-center">对比行政区</div>
+                      <div className="text-center">客流相关性</div>
+                   </div>
+                   {[
+                     { k: '门店竞争关系', v: '高于平均22.5%', rel: '较高', good: false },
+                     { k: '服务潜力度', v: '高于平均22.5%', rel: '较高', good: true },
+                     { k: '线上竞争关系', v: '高于平均22.5%', rel: '较高', good: false },
+                     { k: '存续竞争力', v: '低于平均62.5%', rel: '较低', good: true },
+                     { k: '品牌冲撞力', v: '低于平均62.5%', rel: '较低', good: true }
+                   ].map((row, i) => (
+                     <div key={i} className="grid grid-cols-3 py-2.5 border-b border-slate-100 last:border-0 bg-white">
+                        <div className="text-center text-slate-700">{row.k}</div>
+                        <div className={`text-center font-bold ${row.good ? 'text-green-600' : 'text-red-500'}`}>
+                           {row.good ? '↓ ' : '↑ '} {row.v.replace(/高于|低于|平均/g, '')}
+                        </div>
+                        <div className="text-center text-slate-500">{row.rel}</div>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             {/* Section 6: 发展潜力 */}
+             <div id="section-potential" className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 scroll-mt-36">
+                <div className="flex justify-between items-center mb-4">
+                   <div className="flex items-center gap-2">
+                      <div className="w-1.5 h-4 bg-purple-500 rounded-full"></div>
+                      <h3 className="font-bold text-slate-800 text-base">发展潜力预估</h3>
+                   </div>
+                   <span className="text-xl font-extrabold text-purple-500 italic">96分</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                   <div className="border border-slate-200 rounded-xl p-3">
+                      <div className="text-xs text-slate-500 mb-1">同业态品牌入驻数(一年内)</div>
+                      <div className="font-bold text-slate-800">32个</div>
+                   </div>
+                   <div className="border border-slate-200 rounded-xl p-3">
+                      <div className="text-xs text-slate-500 mb-1">同业态品牌撤离数(一年内)</div>
+                      <div className="font-bold text-slate-800">2个</div>
+                   </div>
+                </div>
+
+                {/* 交通通达性 */}
+                <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 mb-4">
+                   <h4 className="text-xs font-bold text-blue-800 mb-3 border-l-2 border-blue-500 pl-2">交通通达性</h4>
+                   <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-white p-2 rounded shadow-sm text-center">
+                         <div className="flex justify-center mb-1"><Car size={14} className="text-slate-400"/></div>
+                         <div className="text-[10px] text-slate-500">停车泊位</div>
+                         <div className="font-bold text-slate-800">76</div>
+                         <div className="text-[8px] text-red-500">高于平均</div>
+                      </div>
+                      <div className="bg-white p-2 rounded shadow-sm text-center">
+                         <div className="flex justify-center mb-1"><Bike size={14} className="text-slate-400"/></div>
+                         <div className="text-[10px] text-slate-500">主干道</div>
+                         <div className="font-bold text-slate-800">95</div>
+                         <div className="text-[8px] text-red-500">高于平均</div>
+                      </div>
+                      <div className="bg-white p-2 rounded shadow-sm text-center">
+                         <div className="flex justify-center mb-1"><Train size={14} className="text-slate-400"/></div>
+                         <div className="text-[10px] text-slate-500">地铁站</div>
+                         <div className="font-bold text-slate-800">3</div>
+                         <div className="text-[8px] text-red-500">高于平均</div>
+                      </div>
+                   </div>
+                </div>
+
+                {/* 消费能力弹性 */}
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                   <h4 className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
+                      <Wallet size={14} /> 消费能力弹性指数 <span className="text-purple-600">90</span>
+                   </h4>
+                   <div className="flex h-20 rounded-lg overflow-hidden text-white text-xs font-bold shadow-sm">
+                      <div className="w-[30%] bg-blue-500 flex flex-col items-center justify-center p-1">
+                         <span>线下</span>
+                         <span>30%</span>
+                      </div>
+                      <div className="w-[30%] bg-indigo-500 flex flex-col items-center justify-center p-1 border-l border-white/20">
+                         <span>线上</span>
+                         <span>30%</span>
+                      </div>
+                      <div className="w-[40%] flex flex-col">
+                         <div className="h-1/2 bg-yellow-400 flex items-center justify-center text-yellow-900">聚客点驱动 10%</div>
+                         <div className="flex-1 flex">
+                            <div className="w-1/2 bg-emerald-400 flex items-center justify-center text-[8px]">高消费 10%</div>
+                            <div className="w-1/2 bg-slate-500 flex items-center justify-center text-[8px]">娱乐 10%</div>
+                         </div>
+                      </div>
+                   </div>
+                </div>
              </div>
 
           </div>
@@ -445,7 +818,7 @@ const EvaluationReportView = ({ result, onClose, onSave, isSaved, isSaving, back
   );
 };
 
-// --- 子组件提取：推荐结果列表 ---
+// ... (RecommendationResultList and DashboardPage code remains unchanged)
 const RecommendationResultList = ({ items, onClose, onItemClick }: { items: RecommendationItem[], onClose: () => void, onItemClick: (item: RecommendationItem) => void }) => (
   <div className="flex flex-col h-full bg-white relative">
      <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white z-10">
@@ -525,6 +898,18 @@ export const DashboardPage: React.FC = () => {
 
   // Toast 状态
   const [toastMsg, setToastMsg] = useState<{text: string, type: 'info' | 'success'} | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 全局 Toast 显示函数 (6s 自动消失)
+  const showToast = (text: string, type: 'info' | 'success' = 'info') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToastMsg({ text, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToastMsg(null);
+    }, 6000);
+  };
 
   // --- 战略地图数据 ---
   const [strategicData, setStrategicData] = useState<StrategicPoint[]>([]);
@@ -620,8 +1005,7 @@ export const DashboardPage: React.FC = () => {
   // 扎点模式开启
   const startPinning = () => {
     setIsPinningMode(true);
-    setToastMsg({ text: '请在地图上选择点位，补充点位信息后确认添加', type: 'info' });
-    setTimeout(() => setToastMsg(null), 4000);
+    showToast('请在地图上选择点位，补充点位信息后确认添加', 'info');
   };
 
   // 地图点击回调
@@ -637,8 +1021,7 @@ export const DashboardPage: React.FC = () => {
       setEvalForm({ ...evalForm, address: pinDialog.name });
       setPinDialog(null);
       setIsPinningMode(false);
-      setToastMsg({ text: '点位已添加', type: 'success' });
-      setTimeout(() => setToastMsg(null), 2000);
+      showToast('点位已添加', 'success');
     } else {
       alert("请输入点位名称");
     }
@@ -647,7 +1030,7 @@ export const DashboardPage: React.FC = () => {
   // 执行评估
   const handleStartEvaluation = async () => {
     if (!evalForm.address) {
-       setToastMsg({ text: '请先输入地址或在地图选点', type: 'info' });
+       showToast('请先输入地址或在地图选点', 'info');
        return;
     }
     if (!user) return;
@@ -681,7 +1064,7 @@ export const DashboardPage: React.FC = () => {
        setEvalResult(result);
        setEvalStatus('success');
        clearInterval(timer);
-       setToastMsg({ text: '评估报告生成成功', type: 'success' });
+       showToast('评估报告生成成功', 'success');
 
     } catch (e: any) {
        setEvalStatus('idle');
@@ -725,9 +1108,9 @@ export const DashboardPage: React.FC = () => {
     try {
       await mockService.saveReportAPI(user.id, targetResult);
       setIsReportSaved(true);
-      setToastMsg({ text: '报告与地图快照保存成功', type: 'success' });
+      showToast('报告与地图快照保存成功', 'success');
     } catch(e) {
-      setToastMsg({ text: '保存失败', type: 'info' });
+      showToast('保存失败', 'info');
     } finally {
       setIsSaving(false);
     }

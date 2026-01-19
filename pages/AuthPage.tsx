@@ -54,7 +54,8 @@ export const AuthPage: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    // 全局统一 6s 自动消失
+    setTimeout(() => setToastMessage(null), 6000);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
